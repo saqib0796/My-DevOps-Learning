@@ -1,0 +1,2 @@
+*/5 * * * * /home/obb-agent/myagent/agentstscheck.sh >/dev/null 2>&1
+*/60 * * * * /home/obb-agent/myagent/filecheck.sh >/dev/null 2>&1

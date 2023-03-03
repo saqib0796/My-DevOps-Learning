@@ -1,0 +1,214 @@
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+    - develop-pwc-features
+    - release/*
+name: $(Date:yyMMdd)$(Rev:.rrr)
+pool:
+  vmImage: ubuntu-latest
+variables:
+- name: packageJsonFile
+  value: shells/portal-shell/package.json
+- name: zipPrefix
+  value: UOCWebUI_
+- name: feedPath
+  value: uoc-feed
+- name: feedPackageName
+  value: uoc-web-ui
+- name: feedPackageDescription
+  value: Web (3D Viewer) UI component of UOC
+- group: uoc-web-integration-tests
+- name: isDevelop
+  value: $[eq(variables['Build.SourceBranch'], 'refs/heads/develop')]
+stages:
+- stage: __default
+  jobs:
+  - job: Build_And_Unit_Tests
+    steps:
+    - task: replacetokens@4
+      inputs:
+        targetFiles: 'shells/portal-shell/src/assets/js/build-constants.ts'
+        encoding: 'auto'
+        tokenPattern: 'default'
+        writeBOM: true
+        actionOnMissing: 'fail'
+        keepToken: false
+        actionOnNoFiles: 'fail'
+        enableTransforms: false
+        useLegacyPattern: false
+        enableTelemetry: false
+    - task: Bash@3
+      displayName: 'Generate Version'
+      name: SetVersion
+      inputs:
+        targetType: 'inline'
+        script: >
+          rawVersion=$(jq -r .version shells/portal-shell/package.json)
+
+
+          major=$(echo $rawVersion | cut -d '.' -f1)
+
+          echo "This is the major version: $major"
+
+          echo "##vso[task.setvariable variable=major]$major"
+
+
+          minor=$(echo $rawVersion | cut -d '.' -f2)
+
+          echo "This is the minor version: $minor"
+
+          echo "##vso[task.setvariable variable=minor]$minor"
+
+
+          patch=$(echo $BUILD_BUILDNUMBER | sed 's/\.//g')
+
+          echo "This is the patch version: $patch"
+
+          echo "This is the build: $BUILD_BUILDNUMBER"
+
+          echo "##vso[task.setvariable variable=patch]$patch"
+
+
+          branch=$(echo $BUILD_SOURCEBRANCH | cut -d'/' -f 3,4 | tr '/' '-')
+
+          version=${major}.${minor}.${patch}-${branch}
+
+          echo "This is the version: $version"
+
+          echo "##vso[task.setvariable variable=version]$version"
+
+          echo "##vso[task.setvariable variable=outputVersion;isOutput=true]$version"
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+        versionSpec: '16.x'
+    - task: CmdLine@2
+      displayName: 'Update from build in package.json'
+      inputs:
+        script: |
+          cd $(dirname $(packageJsonFile))
+          npm version $(version)
+    - task: CmdLine@2
+      condition: and(succeeded(), eq(variables.isDevelop, 'false'))
+      displayName: 'npm build (production)'
+      inputs:
+        script: |
+          yarn run bootstrap
+          yarn run package:production
+    - task: CmdLine@2
+      condition: and(succeeded(), eq(variables.isDevelop, 'true'))
+      displayName: 'npm build (development)'
+      inputs:
+        script: |
+          yarn run bootstrap
+          yarn run package:dev
+    - task: ArchiveFiles@2
+      displayName: 'Archiving build output to Zip'
+      inputs:
+        rootFolderOrFile: '$(Build.Repository.LocalPath)/shells/portal-shell/dist/uoc-portal'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(zipPrefix)$(version).zip'
+        replaceExistingArchive: true
+        verbose: true
+    - task: CmdLine@2
+      displayName: 'Run unit tests'
+      inputs:
+        script: |
+          yarn test:ci
+    - task: PublishTestResults@2
+      displayName: 'Publish unit test results'
+      condition: succeededOrFailed()
+      inputs:
+        searchFolder: $(Build.SourcesDirectory)
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/TESTS*.xml'
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish code coverage report'
+      condition: succeededOrFailed()
+      inputs:
+        codeCoverageTool: Cobertura
+        summaryFileLocation: '$(Build.SourcesDirectory)/**/**/coverage/**/cobertura-coverage.xml'
+        failIfCoverageEmpty: true
+    - task: PublishBuildArtifacts@1
+      condition: succeeded()
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)/$(zipPrefix)$(version).zip'
+        artifactName: WebAppBuild
+  - job: Smoke_Tests
+    steps:
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+        versionSpec: '16.x'
+    - task: CmdLine@2
+      displayName: 'npm build'
+      inputs:
+        script: |
+          cd smoke
+          yarn install
+    - task: Bash@3
+      displayName: "Run Smoke tests"
+      continueOnError: true
+      inputs:
+        targetType: inline
+        script: |
+          cd smoke
+          yarn test:smoke:headless
+    - task: PublishTestResults@2
+      displayName: 'Publish smoke test results'
+      condition: succeededOrFailed()
+      inputs:
+        searchFolder: $(Build.SourcesDirectory)
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/TEST-smoke*.xml'
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Playwright Videos'
+      condition: in(variables['Agent.JobStatus'], 'Failed', 'SucceededWithIssues')
+      inputs:
+        PathtoPublish: '$(Build.SourcesDirectory)/smoke/test-results'
+        ArtifactName: 'smoke-test-playwright-videos'
+        publishLocation: 'Container'
+  - job: Upload_Artifacts
+    dependsOn:
+    - Build_And_Unit_Tests
+    - Smoke_Tests
+    variables:
+    - name: version
+      value: $[ dependencies.Build_And_Unit_Tests.outputs['SetVersion.outputVersion'] ]
+    condition: |
+      and(
+        succeeded('Build_And_Unit_Tests'),
+        ne(variables['Build.Reason'], 'PullRequest'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop-pwc-features'),
+          contains(variables['Build.SourceBranch'], 'refs/heads/release/')
+        )
+      )
+    steps:
+    - task: 6d15af64-176c-496d-b583-fd2ae21d4df4@1
+      condition: false
+      inputs:
+        repository: none
+    - task: DownloadBuildArtifacts@0
+      displayName: 'Download Build Artifacts'
+      inputs:
+        downloadType: 'single'
+        artifactName: WebAppBuild
+        downloadPath: $(Build.ArtifactStagingDirectory)
+    - task: UniversalPackages@0
+      displayName: 'Publish Artifacts to feed'
+      inputs:
+        command: 'publish'
+        publishDirectory: '$(Build.ArtifactStagingDirectory)/WebAppBuild/$(zipPrefix)$(version).zip'
+        feedsToUsePublish: 'internal'
+        vstsFeedPublish: $(feedPath)
+        vstsFeedPackagePublish: $(feedPackageName)
+        versionOption: 'custom'
+        versionPublish: $(version)
+        packagePublishDescription: $(feedPackageDescription)
+

@@ -1,0 +1,61 @@
+version: '2'
+services:
+
+  #PHP Service
+  app:
+    build:
+      context: .
+      dockerfile: /home/saqib/build/php-fpm/Dockerfile
+    container_name: app
+    restart: unless-stopped
+    environment:
+      - "DB_PORT=3306"
+      - "DB_HOST=database"
+    working_dir: /var/www
+    volumes:
+      - ./code:/var/www
+      - ./code/local.ini:/usr/local/etc/php/conf.d/docker-custom-php.ini
+    networks:
+      - app-network
+
+  #Nginx Service
+  webserver:
+    build:
+      context: ./
+      dockerfile: /home/saqib/build/nginx/Dockerfile
+    container_name: webserver
+    restart: unless-stopped
+    volumes_from:
+      - app
+    working_dir: /var/www    
+    ports:
+      - "80:80"
+  #   - "443:443"
+    networks:
+      - app-network
+
+  #MySQL Service
+  forrun_db:
+    image: mariadb:10.1.48
+    container_name: forrun_db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      #MYSQL_DATABASE: 
+      MYSQL_ROOT_PASSWORD: ArpatecH157
+      #SERVICE_TAGS: dev
+      #SERVICE_NAME: mysql
+    volumes:
+      - dbdata:/var/lib/mysql/
+      - ./build/mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - app-network
+        #Docker Networks
+networks:
+  app-network:
+    driver: bridge
+    #Volumes
+volumes:
+  dbdata:
+    driver: local

@@ -1,0 +1,75 @@
+1) df -h
+2) fdisk -l
+
+[ec2-user@ip-172-31-6-21 ~]$ sudo fdisk -l
+Disk /dev/xvda: 8 GiB, 8589934592 bytes, 16777216 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: 5A72544B-A4E2-4BBE-AED0-04F727374581
+
+Device       Start      End  Sectors Size Type
+/dev/xvda1    4096 16777182 16773087   8G Linux filesystem
+/dev/xvda128  2048     4095     2048   1M BIOS boot
+
+Partition table entries are not in disk order.
+
+
+Disk /dev/xvdf: 5 GiB, 5368709120 bytes, 10485760 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+3) cd 
+4) cd /home/ec2-user/
+5) fdisk /dev/xvdf
+
+6) Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-10485759, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-10485759, default 10485759): 
+
+Created a new partition 1 of type 'Linux' and of size 5 GiB.
+
+7) Command (m for help): t
+Selected partition 1
+Hex code (type L to list all codes): 8e
+Changed type of partition 'Linux' to 'Linux LVM'.
+
+8) Command (m for help): p
+Disk /dev/xvdf: 5 GiB, 5368709120 bytes, 10485760 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xe92528c1
+
+Device     Boot Start      End  Sectors Size Id Type
+/dev/xvdf1       2048 10485759 10483712   5G 8e Linux LVM
+
+9) Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+10) yum install lvm2
+
+11)  pvcreate /dev/xvdf1
+ 
+12) vgcreate myvg0 /dev/xvdf1 
+13) lvcreate -L 5G -n saqib myvg0
+14) mkfs -t ext3 /dev/myvg0/saqib
+15) mkdir /mnt/mate
+16) mount -t ext3 /dev/myvg0/saqib /mnt/mate/
+17) df -h
+
+
+LVM extend operation:
+
+1) lvextend -L+0.5G /dev/myvg0/saqib
+2) resize2fs /dev/myvg0/saqib

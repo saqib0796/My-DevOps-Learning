@@ -1,0 +1,102 @@
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+    - release/*
+name: $(Date:yyMMdd)$(Rev:.rrr)
+variables:
+- name: solution
+  value: '**/*.sln'
+- name: buildPlatform
+  value: 'Any CPU'
+- name: buildConfiguration
+  value: 'Release'
+- name: zipPrefix
+  value: BIMStore_
+- name: feedPath
+  value: uoc-feed
+- name: feedPackageName
+  value: bim-store
+- name: feedPackageDescription
+  value: Authenticate BIM Models with Azure AD User
+stages:
+- stage: __default
+  jobs:
+  - job: Job
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - task: NuGetToolInstaller@1
+      displayName: 'Use NuGet 5.11.0'
+      inputs:
+        versionSpec: 5.11.0
+    - task: NuGetCommand@2
+      displayName: 'NuGet restore'
+      inputs:
+        command: 'restore'
+        restoreSolution: '**/*.sln'
+        feedsToUse: 'select'
+        vstsFeed: 'data-nuget'
+    - task: PowerShell@2
+      displayName: 'Generate Version'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $xml = [Xml] (Get-Content **/*.csproj)
+          $rawVersion = $xml.Project.PropertyGroup.Version
+
+          $verArr = $rawVersion.split('.')
+
+          $major = $verArr[0]
+          echo "This is the major version: $major"
+          echo "##vso[task.setvariable variable=major]$major"
+
+          $minor = $verArr[1]
+          echo "This is the minor version: $minor"
+          echo "##vso[task.setvariable variable=minor]$minor"
+
+          $patch = $env:BUILD_BUILDNUMBER -replace '\.', ''
+          echo "This is the patch version: $patch"
+          echo "This is the build: $env:BUILD_BUILDNUMBER"
+          echo "##vso[task.setvariable variable=patch]$patch"
+
+          $branch = $($env:BUILD_SOURCEBRANCH | cut -d'/' -f 3,4 | tr '/' '-')
+          $version = "$major.$minor.$patch-$branch"
+          echo "This is the version: $version"
+          echo "##vso[task.setvariable variable=version]$version"
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '5.0.100'
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet publish'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/*.csproj'
+        modifyOutputPath: false
+        arguments: '-o $(build.artifactstagingdirectory)/$(zipPrefix)$(version) -c Release'
+        zipAfterPublish: true
+    - task: UniversalPackages@0
+      displayName: 'Publish Artifacts to feed'
+      condition: |
+        and(
+          succeeded(),
+          ne(variables['Build.Reason'], 'PullRequest'),
+          or(
+            eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+            eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+            contains(variables['Build.SourceBranch'], 'refs/heads/release/')
+          )
+        )
+      inputs:
+        command: 'publish'
+        publishDirectory: '$(Build.ArtifactStagingDirectory)/$(zipPrefix)$(version)'
+        feedsToUsePublish: 'internal'
+        vstsFeedPublish: $(feedPath)
+        vstsFeedPackagePublish: $(feedPackageName)
+        versionOption: 'custom'
+        versionPublish: $(version)
+        packagePublishDescription: $(feedPackageDescription)
+

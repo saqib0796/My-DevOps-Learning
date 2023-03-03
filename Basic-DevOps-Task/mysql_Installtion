@@ -1,0 +1,49 @@
+*INSTALLATION OF MYSQL:
+
+Step 1: Install wget
+
+    Go to /home/ec2-user
+
+    sudo yum install wget
+
+Step 2: Use wget to download the MySQL Yum repository:
+
+    wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm
+
+Step 3: Now, install the mysql locally
+
+    sudo yum localinstall mysql80-community-release-el7-3.noarch.rpm
+
+Step 4: Install MySQL community server
+
+    sudo yum install mysql-community-server
+
+Step 5: Confirm your MySQL service status
+
+    sudo service mysqld status
+
+
+*TEMPORARY PASSWORD CREATION:
+
+sudo grep 'temporary password' /var/log/mysqld.log
+
+*MY.CNF FILE FOR MYSQL:
+ [mysqld]
+ server-id=1
+ datadir=/var/lib/mysql
+ socket=/var/lib/mysql/mysql.sock
+ log-bin
+ binlog-do-db=db1
+
+
+FOR SET NEW PASSWORD:
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyNewPass';
+
+ip-172-31-21-170-bin.000001 |      693 | db1          |    
+
+
+serverC: 3.15.191.104*
+serverD: 52.14.131.112
+
+ip-172-31-6-21-bin.000001 |      155 | db1      
+

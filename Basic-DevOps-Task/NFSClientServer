@@ -1,0 +1,52 @@
+Configuring the Server Machine
+
+Step 1: Install NFS Kernel Server
+sudo apt-get update
+sudo apt install nfs-kernel-server
+
+Step 2: Create the Export Directory
+sudo mkdir -p /mnt/sharedfolder
+sudo chown nobody:nogroup /mnt/sharedfolder
+sudo chmod 777 /mnt/sharedfolder
+
+Step 3: Assign server access to client(s) through NFS export file
+sudo nano /etc/exports
+
+A single client by adding the following line in the file:
+/mnt/sharedfolder clientIP(rw,sync,no_subtree_check)
+
+Multiple clients by adding the following lines in the file:
+/mnt/sharedfolder client1IP(rw,sync,no_subtree_check)
+/mnt/sharedfolder client2IP(rw,sync,no_subtree_check)
+
+Multiple clients, by specifying an entire subnet that the clients belong to:
+/mnt/sharedfolder subnetIP/24(rw,sync,no_subtree_check)
+
+Step 4: Export the shared directory
+sudo exportfs -a
+sudo systemctl restart nfs-kernel-server
+
+Step 5: Open firewall for the client (s)
+sudo ufw allow from [clientIP or clientSubnetIP] to any port nfs
+sudo ufw allow from 192.168.100/24 to any port nfs
+sudo ufw status
+
+Configuring the Client Machine
+
+Step 1: Install NFS Common
+sudo apt-get update
+sudo apt-get install nfs-common
+
+Step 2: Create a mount point for the NFS host’s shared folder
+sudo mkdir -p /mnt/sharedfolder_client
+
+Step 3: Mount the shared directory on the client
+sudo mount serverIP:/exportFolder_server /mnt/mountfolder_client
+sudo mount 192.168.100.5:/mnt/sharedfolder /mnt/sharedfolder_client
+
+Step 4: Test the connection
+Please create or save a file in the export folder of the NFS host server. Now, open the mount folder on the client machine; you should be able to view the same file shared and accessible in this folder.
+
+
+
+

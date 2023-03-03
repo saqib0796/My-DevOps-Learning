@@ -1,0 +1,80 @@
+Ubuntu
+
+Run the following commands using a terminal window, or the CLI:
+
+Get the latest package info:
+sudo apt-get update
+
+Install libodbc.so, libtdsS.so, isql, and isqlinst:
+sudo apt-get install unixodbc
+
+Install libtsdsodbc.so and tsql:
+sudo apt-get install tdsodbc
+
+Create a file called odbc.ini
+
+
+All that is required is to configure the odbc.ini file.
+Note: freetds.conf is not required.
+
+The odbc.ini configuration will be something like this:
+Note: The <comments> in angle brackets should not be included.
+
+Ubuntu:
+
+Bare minimum:
+Driver = /usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so
+Setup = /usr/lib/x86_64-linux-gnu/odbc/libtdsS.so
+Server = your_server_name
+Port = 1433
+
+
+With user etc:
+Driver = /usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so
+Setup = /usr/lib/x86_64-linux-gnu/odbc/libtdsS.so
+Server = your_server_name <network name or IP address for the server>
+Port = 1433 <1433 = default - a different port can be used>
+Database = dbname <if omitted the default database will be used>
+Username = dbusername <if omitted then integrated security is used - needs kerberos>
+Password = dbpassword
+
+apt install php7.2-odbc
+
+
+/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.4.so.2.1(INSTALLATION)
+
+   23  curl https://packages.microsoft.com/config/ubuntu/18.04/prod.list > /etc/apt/sources.list.d/mssql-release.list
+   24  sudo apt-get update
+   25  sudo ACCEPT_EULA=Y apt-get install msodbcsql17
+   26  ls
+   27  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EB3E94ADBE1229CF
+   28  sudo apt-get update
+   29  ls
+   30  sudo ACCEPT_EULA=Y apt-get install msodbcsql17
+   31  ACCEPT_EULA=Y apt-get install mssql-tools
+   32  echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
+   33  echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+   34  source ~/.bashrc
+
+cd /var/www/html/
+sudo nano index.php
+
+
+<content>
+
+<?php
+error_reporting(E_ALL);
+$database = "testing1";
+$user = "admin";
+$password = 'T3S$ting67';
+$serverName = "database-1.cav3ly47ksqq.ap-southeast-1.rds.amazonaws.com";
+$connection = odbc_connect("Driver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.4.so.2.1;Server=$serverName;Database=$database;", $user, $password);
+$result = odbc_exec( $connection , "select first_name from market_tbl where id=1" );
+$data = odbc_result($result,'first_name');
+die($data);
+die($connection);
+
+?>
+
+
+
